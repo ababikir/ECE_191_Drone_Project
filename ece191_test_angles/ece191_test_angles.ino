@@ -4,9 +4,11 @@
 #include <Adafruit_LSM9DS0.h>
 
 Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
-float calAccX = 0, calAccY = 0;
-float calGyroX = 0, calGyroY = 0, calGyroZ = 0;
-float angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
+double calAccX = 0, calAccY = 0;
+double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
+double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
+double prev_time = 0;
+double dt;
 
 
 /* Functions */
@@ -77,35 +79,37 @@ void setup() {
 void loop() {
   
   sensors_event_t accel, mag, gyro, temp;
-  float accelX, accelY, accelZ;
-  float gyroX, gyroY;
+  double accelX, accelY, accelZ;
+  double gyroX, gyroY, gyroZ;
+  double time_1;
+  double dt;
+  double test = 1000.0;
   
-  lsm.getEvent(&accel, &mag, &gyro, &temp); 
-  
-  // Uncomment for acceleration measurement
+  time_1 = float(millis());
+  lsm.getEvent(&accel, &mag, &gyro, &temp);
+  delay(50);
+  dt = (millis() - time_1);
+  dt /= test;
  
   accelX = accel.acceleration.x - calAccX;
-  //Serial.print(accelX);
-  //Serial.print(",");
-
   accelY = accel.acceleration.y - calAccY;
-  //Serial.print(accelY);
-  //Serial.print(",");
-
-  
-  //Serial.print(accelZ);
-  //Serial.print(",");
   
   gyroX = gyro.gyro.x - calGyroX;
   gyroY = gyro.gyro.y - calGyroY;
-
-  //Serial.println(gyroX);
-
- // Serial.println(gyroX);
-  angle_pitch += gyroX/125; // 125 Hz, for integration, not confirmed
-  angle_roll += gyroY/125;
+  gyroZ = gyro.gyro.z - calGyroZ;
+  //dt = (millis() - prev_time) / (1000.0);
+  //dt = .01;
+  // Gyro Integration
+  angle_pitch = angle_pitch + (gyroX*dt); 
+  angle_roll += gyroY*dt; 
+  //prev_time = millis();
+  // Adjust for yaw rotation
+  //angle_pitch += angle_roll * sin(gyroZ * dt);               //If the IMU has yawed transfer the roll angle to the pitch angel
+  //angle_roll -= angle_pitch * sin(gyroZ * 0.000001066);               //If the IMU has yawed transfer the pitch angle to the roll angel
   
-  Serial.println(angle_roll);
+  
+  
+  Serial.println(angle_pitch);
   //delay(50); // 50 ms delay
-  
+    
 }
