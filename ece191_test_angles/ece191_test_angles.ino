@@ -70,7 +70,7 @@ void setup() {
   Serial.println(F("Found LSM9DS0 9DOF"));
   configureSensor();
 
-  calibrateSensor(1000);
+  calibrateSensor(2000);
 
 }
 
@@ -78,7 +78,7 @@ void loop() {
   
   sensors_event_t accel, mag, gyro, temp;
   float accelX, accelY, accelZ;
-  float gyroX;
+  float gyroX, gyroY;
   
   lsm.getEvent(&accel, &mag, &gyro, &temp); 
   
@@ -92,16 +92,20 @@ void loop() {
   //Serial.print(accelY);
   //Serial.print(",");
 
-  accelZ = accel.acceleration.z - calAccZ;
+  
   //Serial.print(accelZ);
   //Serial.print(",");
   
   gyroX = gyro.gyro.x - calGyroX;
+  gyroY = gyro.gyro.y - calGyroY;
+
   //Serial.println(gyroX);
 
  // Serial.println(gyroX);
-  angle_pitch += gyroX/400;
-  Serial.println(angle_pitch);
+  angle_pitch += gyroX/125; // 125 Hz, for integration, not confirmed
+  angle_roll += gyroY/125;
+  
+  Serial.println(angle_roll);
   //delay(50); // 50 ms delay
   
 }
