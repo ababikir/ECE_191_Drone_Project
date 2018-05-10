@@ -82,14 +82,10 @@ void loop() {
   double accelX, accelY, accelZ;
   double gyroX, gyroY, gyroZ;
   double time_1;
-  double dt;
-  double test = 1000.0;
   
-  time_1 = float(millis());
   lsm.getEvent(&accel, &mag, &gyro, &temp);
-  delay(50);
-  dt = (millis() - time_1);
-  dt /= test;
+  dt = (millis() - prev_time) / (1000.0);
+
  
   accelX = accel.acceleration.x - calAccX;
   accelY = accel.acceleration.y - calAccY;
@@ -100,6 +96,7 @@ void loop() {
   //dt = (millis() - prev_time) / (1000.0);
   //dt = .01;
   // Gyro Integration
+  prev_time = millis();
   angle_pitch = angle_pitch + (gyroX*dt); 
   angle_roll += gyroY*dt; 
   //prev_time = millis();
@@ -109,7 +106,7 @@ void loop() {
   
   
   
-  Serial.println(angle_pitch);
+  Serial.println(angle_pitch, 6);
   //delay(50); // 50 ms delay
     
 }
