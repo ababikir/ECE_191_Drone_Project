@@ -33,11 +33,15 @@ void configureSensor(void)
   //lsm.setupGyro(lsm.LSM9DS0_GYROSCALE_2000DPS);
 }
 
-void calibrateSensor(int numData)
+boolean calibrateSensor(int numData)
 {
+  sensors_event_t accel, mag, gyro, temp;
   int i;
+  double calibrationValue = 0.5;
+  double gyroX, gyroY, gyroZ;
+  
   for (i = 0; i < numData; i += 1){
-    sensors_event_t accel, mag, gyro, temp;
+
     lsm.getEvent(&accel, &mag, &gyro, &temp); 
     calAccX += accel.acceleration.x;
     calAccY += accel.acceleration.y;
@@ -52,10 +56,34 @@ void calibrateSensor(int numData)
   calAccX /= numData;
   calAccY /= numData;
 
+  // Test calibration
+  lsm.getEvent(&accel, &mag, &gyro, &temp); 
+  
+  gyroX = gyro.gyro.x - calGyroX;
+  gyroY = gyro.gyro.y - calGyroY;
+  gyroZ = gyro.gyro.z - calGyroZ;
+  
+  if(gyroX > calibrationValue || gyroX < -1*calibrationValue) {
+    Serial.print("Bad calibration value: ");
+    Serial.println(gyroX);
+    return false;
+  }
+  if(gyroY > calibrationValue || gyroY < -1*calibrationValue) {
+    Serial.print("Bad calibration value: ");
+    Serial.println(gyroY);
+    return false;
+  }
+  if(gyroZ > calibrationValue || gyroZ < -1*calibrationValue) {
+    Serial.print("Bad calibration value: ");
+    Serial.println(gyroZ);
+    return false;
+  }
+  return true;
 }
 
 
 void setup() {
+  boolean goodCalibration = false;
 #ifndef ESP8266
   while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
 #endif
@@ -72,8 +100,10 @@ void setup() {
   Serial.println(F("Found LSM9DS0 9DOF"));
   configureSensor();
 
-  calibrateSensor(2000);
-
+  while(!goodCalibration) {
+    Serial.println("Needs New Calibration");
+    goodCalibration = calibrateSensor(1000);
+  }
 }
 
 void loop() {
@@ -81,30 +111,43 @@ void loop() {
   sensors_event_t accel, mag, gyro, temp;
   double accelX, accelY, accelZ;
   double gyroX, gyroY, gyroZ;
-  double time_1;
+  double convertTimeRadians;
+  double acc_mag_vector;
+  double angle_pitch_acc, angle_roll_acc;
+  double filterConstant = .9996;
+  double convertToDegrees;
   
   lsm.getEvent(&accel, &mag, &gyro, &temp);
-  dt = (millis() - prev_time) / (1000.0);
+  dt = (millis() - prev_time) / (1000.0); 
+  // Best way to get time is through getting clock cycle of gyro not this dt
 
  
   accelX = accel.acceleration.x - calAccX;
   accelY = accel.acceleration.y - calAccY;
+  accelZ = accel.acceleration.z;
   
   gyroX = gyro.gyro.x - calGyroX;
   gyroY = gyro.gyro.y - calGyroY;
   gyroZ = gyro.gyro.z - calGyroZ;
-  //dt = (millis() - prev_time) / (1000.0);
-  //dt = .01;
+
   // Gyro Integration
   prev_time = millis();
-  angle_pitch = angle_pitch + (gyroX*dt); 
+  angle_pitch += (gyroX*dt); 
   angle_roll += gyroY*dt; 
-  //prev_time = millis();
+
   // Adjust for yaw rotation
-  //angle_pitch += angle_roll * sin(gyroZ * dt);               //If the IMU has yawed transfer the roll angle to the pitch angel
-  //angle_roll -= angle_pitch * sin(gyroZ * 0.000001066);               //If the IMU has yawed transfer the pitch angle to the roll angel
+  convertTimeRadians = dt * PI/ 180.0;
+  angle_pitch += angle_roll * sin(gyroZ * convertTimeRadians);               //If the IMU has yawed transfer the roll angle to the pitch angel
+  angle_roll -= angle_pitch * sin(gyroZ * convertTimeRadians);               //If the IMU has yawed transfer the pitch angle to the roll angel
   
-  
+  //Accelerometer angle calculations
+  acc_mag_vector = sqrt((accelX*accelX)+(accelY*accelY)+(accelZ*accelZ));  //Calculate the total accelerometer vector
+  convertToDegrees = 1 / (PI / 180.0);
+  angle_pitch_acc = asin((double)accelY/acc_mag_vector)* convertToDegrees;       //Calculate the pitch angle
+  angle_roll_acc = asin((double)accelX/acc_mag_vector)* -convertToDegrees;       //Calculate the roll angle
+
+  angle_pitch = angle_pitch * filterConstant + angle_pitch_acc * (1.0-filterConstant);     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
+  angle_roll = angle_roll * filterConstant + angle_roll_acc * -(1.0-filterConstant);        //Correct the drift of the gyro roll angle with the accelerometer roll angle
   
   Serial.println(angle_pitch, 6);
   //delay(50); // 50 ms delay
