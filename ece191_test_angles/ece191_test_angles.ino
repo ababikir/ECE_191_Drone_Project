@@ -37,7 +37,7 @@ boolean calibrateSensor(int numData)
 {
   sensors_event_t accel, mag, gyro, temp;
   int i;
-  double calibrationValue = 0.5;
+  double calibrationValue = 0.3;
   double gyroX, gyroY, gyroZ;
   
   for (i = 0; i < numData; i += 1){
@@ -102,7 +102,7 @@ void setup() {
 
   while(!goodCalibration) {
     Serial.println("Needs New Calibration");
-    goodCalibration = calibrateSensor(1000);
+    goodCalibration = calibrateSensor(2000);
   }
 }
 
