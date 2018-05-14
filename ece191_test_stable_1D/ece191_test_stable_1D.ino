@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <Wire.h>
+#include <Servo.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
 
@@ -12,9 +13,21 @@ double dt;
 double cur_time = 0, prev_time;
 double filterConstant = .9996;
 
+// Set-up servos
 
+double PID, error, previous_error;
+double pid_p = 0, pid_i = 0;, pid_d = 0;
 
-/* Functions */
+// PID constants (WILL ADJUST)
+double kp = 3;
+double ki = .01;
+double kd = 2;
+
+// Initial values or servos
+double initial_pos = 90; // 180/2 for full range of motion
+double desired_angle = 0; // to stay steady
+
+// Function to set-up sensor
 void configureSensor(void)
 {
   // 1.) Set the accelerometer range
@@ -36,6 +49,7 @@ void configureSensor(void)
   //lsm.setupGyro(lsm.LSM9DS0_GYROSCALE_2000DPS);
 }
 
+// Function to calibrate sensor, ideally should get (0,0,0)
 boolean calibrateSensor(int numData)
 {
   sensors_event_t accel, mag, gyro, temp;
@@ -107,12 +121,16 @@ void setup() {
     Serial.println("Needs New Calibration");
     goodCalibration = calibrateSensor(2000);
   }
+
+
+  // Attach servos to arduino using the servo.h library and attach method
+  
   
   cur_time = millis();
 }
 
 void loop() {
-  
+
   sensors_event_t accel, mag, gyro, temp;
   double accelX, accelY, accelZ;
   double gyroX, gyroY, gyroZ;
@@ -124,7 +142,7 @@ void loop() {
   prev_time = cur_time;
   cur_time = millis();
   dt = (cur_time - prev_time) / (1000.0);
-  
+
   lsm.getEvent(&accel, &mag, &gyro, &temp);
  
   accelX = accel.acceleration.x - calAccX;
@@ -154,7 +172,31 @@ void loop() {
   angle_pitch = angle_pitch * filterConstant + angle_pitch_acc * (1.0-filterConstant);     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
   angle_roll = angle_roll * filterConstant + angle_roll_acc * -(1.0-filterConstant);        //Correct the drift of the gyro roll angle with the accelerometer roll angle
   
-  Serial.println(angle_pitch, 6);
-  //delay(50); // 50 ms delay
-    
+
+  // Calculate error between either angle_pitch/ angle_roll and desired angle
+  
+  // Calculate pid_p = kp * error;
+  
+  // Calculate pid_i and only use for values between -3 and 3 degrees?
+
+  // Calculate pid_d
+
+  // Calculate PID
+
+  // Make sure that PID does not reach more than let's say 60 positions so 90+60 = 150 or 90-60 = 30
+
+  // Adjust position by adding PID to it
+
+  // Ensure again that new position does not violate anything
+
+  // Write new position to servo
+
+  // set previous error = error
+  
+
+
+
+
+
+
 }
