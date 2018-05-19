@@ -1,11 +1,14 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Servo.h>
+#include <servo.h>//Using servo library to control ESC
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
 
 
-Servo myservo;
+Servo myservo_pitch;
+Servo myservo_roll;
+Servo esc;
 
 Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
 double calAccX = 0, calAccY = 0;
@@ -13,14 +16,14 @@ double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
 double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
 double prev_time = 0;
 double dt;
-double cur_time = 0, prev_time;
-double filterConstant = .9996;
+double cur_time = 0;
+double filterConstant = .99;
 
 // Set-up servos
 
-double PID, error, previous_error, error_total;
-double pid_p = 0, pid_i = 0;, pid_d = 0;
-
+double PID_pitch, PID_roll, error_angle_pitch = 0, error_angle_roll = 0;
+double pid_p_pitch = 0, pid_i_pitch = 0, pid_d_pitch = 0;
+double pid_p_roll = 0, pid_i_roll = 0, pid_d_roll = 0;
 
 
 // PID constants (WILL ADJUST)
@@ -51,7 +54,7 @@ double kd = 2;
 
 // Initial values or servos
 double initial_pos = 90; // 180/2 for full range of motion
-double desired_angle = 0; // to stay steady
+double desired_angle_pitch = 0, desired_angle_roll = 0; // to stay steady
 
 // Function to set-up sensor
 void configureSensor(void)
@@ -151,6 +154,13 @@ void setup() {
 
   // Attach servos to arduino using the servo.h library and attach method
   
+    myservo_pitch.attach(9);  // attaches the servo on pin 9 to the servo object
+    myservo_roll.attach(7);  // attaches the servo on pin 7 to the servo object
+    myservo_pitch.write(initial_pos);
+    myservo_roll.write(initial_pos);
+    
+    esc.attach(5);
+    esc.writeMicroseconds(1000);
   
   cur_time = millis();
 }
@@ -164,6 +174,16 @@ void loop() {
   double acc_mag_vector;
   double angle_pitch_acc, angle_roll_acc;
   double convertToDegrees;
+  double previous_error_pitch = 0, previous_error_roll = 0;
+  double delta_error_pitch = 0, delta_error_roll = 0;
+  double cur_servo_angle_pitch, cur_servo_angle_roll;
+  double new_servo_angle_pitch, new_servo_angle_roll;
+
+// Turns ESC on
+  int val; //Creating a variable val
+  val= analogRead(A0); //Read input from analog pin a0 and store in val
+  val= map(val, 0, 1023,900,2100); //mapping val to minimum and maximum(Change if needed) 
+  esc.writeMicroseconds(val); //using val as the signal to esc
 
   prev_time = cur_time;
   cur_time = millis();
@@ -224,14 +244,14 @@ If error < 0 => You need to increase PID value.
 
 
   
-  error_angle_pitch =  (desired_angle_pitch) - (angle_pitch)   // The pitch angle will have a specific amount of error associated with it. 
+  error_angle_pitch =  (desired_angle_pitch) - (angle_pitch);   // The pitch angle will have a specific amount of error associated with it. 
 
   error_angle_roll =  (desired_angle_roll) - (angle_roll) ;     // The roll angle will have a specific amount of error associated with it.
 
-  error = (error_angle_pitch) + (error_angle_roll);     // The total error from both pitch and roll will be the sum of the errors.
+  //error = (error_angle_pitch) + (error_angle_roll);     // The total error from both pitch and roll will be the sum of the errors.
 
-  delta_error = error - previous_error;   // This is so that we can find the difference in error when we're finding the derivative of error.
-
+  delta_error_pitch = error_angle_pitch - previous_error_pitch;   // This is so that we can find the difference in error when we're finding the derivative of error.
+  delta_error_roll = error_angle_roll - previous_error_roll;
 
 
   
@@ -257,14 +277,8 @@ From my understanding, it should only be ONE proportional controller.
 
 
    
-  pid_p = kp * error;
-  
-
-
-
-
-
-
+  pid_p_pitch = kp * error_angle_pitch;
+  pid_p_roll = kp * error_angle_roll;
 
 
   /*
@@ -321,24 +335,23 @@ changes in the current. I've read online that this is one of the causes of insta
  
   if (angle_roll < 3  || angle_roll > -3 ) {
   
-  pid_i = ki + (error*cur_time);
+  pid_i_roll = ki + (error_angle_roll*cur_time);
     
+  }
+  else {
+    pid_i_roll = 0;
   }
 
 
-  else if (angle_pitch < 3 || angle_pitch <  -3) {
+  if (angle_pitch < 3 || angle_pitch <  -3) {
    
-  pid_i = ki + (error*cur_time);
+  pid_i_pitch = ki + (error_angle_pitch*cur_time);
   }
 
   
   else {
-    pid_i = 0;
+    pid_i_pitch= 0;
   }
-
-
-
-
 
 
   // Calculate pid_d
@@ -370,19 +383,17 @@ Difference in Time = dt (where dt is in seconds)
    */
 
 
-pid_d = (error - previous_error) / (dt);    // Finding derivate of error
-
+pid_d_pitch = (error_angle_pitch - previous_error_pitch) / (dt);    // Finding derivate of error
+pid_d_roll = (error_angle_roll - previous_error_roll) / (dt);
 
   
 
 
-
-
   // Calculate PID
 
-  PID = (pid_p) + (pid_i) + (pid_d);
+  PID_pitch = (pid_p_pitch) + (pid_i_pitch) + (pid_d_pitch);
 
-
+  PID_roll = (pid_p_roll) + (pid_i_roll) + (pid_d_roll);
 
 
   
@@ -392,14 +403,6 @@ pid_d = (error - previous_error) / (dt);    // Finding derivate of error
 
 // I wasn't too sure what I was supposed to do for this part. What do you mean by "reach" more than 60 positions?
 
-
-    
-  
-  
-  
-
-
-  
 
 
 /*
@@ -427,9 +430,13 @@ Setting different values in the servo.write() argument means different things:
   // Adjust position by adding PID to it
 
 
-  cur_servo_angle = servo.read()  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+  cur_servo_angle_pitch = myservo_pitch.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
 
-  new_servo_angle = cur_servo_angle + PID; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
+  new_servo_angle_pitch = cur_servo_angle_pitch + PID_pitch; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
+
+  cur_servo_angle_roll = myservo_roll.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+
+  new_servo_angle_roll = cur_servo_angle_roll + PID_roll; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
 
   /*
 
@@ -443,21 +450,6 @@ Setting different values in the servo.write() argument means different things:
    */
   
   
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
   // Ensure again that new position does not violate anything
 
 
@@ -483,53 +475,71 @@ Setting different values in the servo.write() argument means different things:
 
 // First check if the new_servo_angle that we calculated is past 160 degrees.
 
-  if (  new_servo_angle > 160 ) {
-
-
-  new_servo_angle = cur_servo_angle + ( (1/2) * PID); //I'll only add half of the PID just for now because I think that adding the full PID value would make the new angle go past our threshold. 
+  if (  new_servo_angle_pitch > 140 ) {
+    
+  new_servo_angle_pitch = 140; //I'll only add half of the PID just for now because I think that adding the full PID value would make the new angle go past our threshold. 
     
   }
 
   else {
 
-  new_servo_angle = new_servo_angle;    // Whatever new_servo_angle we just calculated, just make that the new_angle.
+  new_servo_angle_pitch = new_servo_angle_pitch;    // Whatever new_servo_angle we just calculated, just make that the new_angle.
     
   }
 
-  
-  
+  if (  new_servo_angle_roll > 140 ) {
+    
+  new_servo_angle_roll = 140; //I'll only add half of the PID just for now because I think that adding the full PID value would make the new angle go past our threshold. 
+    
+  }
+
+  else {
+
+  new_servo_angle_roll = new_servo_angle_roll;    // Whatever new_servo_angle we just calculated, just make that the new_angle.
+    
+  }
 
 
+   if (  new_servo_angle_pitch < 40 ) {
+    
+  new_servo_angle_pitch = 40; //I'll only add half of the PID just for now because I think that adding the full PID value would make the new angle go past our threshold. 
+    
+  }
 
+  else {
 
+  new_servo_angle_pitch = new_servo_angle_pitch;    // Whatever new_servo_angle we just calculated, just make that the new_angle.
+    
+  }
 
+  if (  new_servo_angle_roll > 40 ) {
+    
+  new_servo_angle_roll = 40; //I'll only add half of the PID just for now because I think that adding the full PID value would make the new angle go past our threshold. 
+    
+  }
 
+  else {
 
-
+  new_servo_angle_roll = new_servo_angle_roll;    // Whatever new_servo_angle we just calculated, just make that the new_angle.
+    
+  }
   
 
   // Write new position to servo
 
 
-  myservo.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
-  new_servo_angle = servo.write(cur_servo_angle + PID); // adjusting position of servo by adding actual PID value to current servo angle.
+ // myservo_pitch.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
+  myservo_pitch.write(new_servo_angle_pitch); // adjusting position of servo by adding actual PID value to current servo angle.
 
+ // myservo_roll.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
+  myservo_roll.write(new_servo_angle_roll); // adjusting position of servo by adding actual PID value to current servo angle.
 
-
-
-
-
-
-
-  
 
   // set previous error = error
 
 
-  previous_error = error;
-  
-
-
+  previous_error_pitch = error_angle_pitch;
+  previous_error_roll = error_angle_roll;
 
 
 }
