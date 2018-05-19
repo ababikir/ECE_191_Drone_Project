@@ -9,8 +9,8 @@ double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
 double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
 double prev_time = 0;
 double dt;
-double cur_time = 0, prev_time;
-double filterConstant = .9996;
+double cur_time = 0;
+double filterConstant = 1;
 
 
 
@@ -154,7 +154,9 @@ void loop() {
   angle_pitch = angle_pitch * filterConstant + angle_pitch_acc * (1.0-filterConstant);     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
   angle_roll = angle_roll * filterConstant + angle_roll_acc * -(1.0-filterConstant);        //Correct the drift of the gyro roll angle with the accelerometer roll angle
   
-  Serial.println(angle_pitch, 6);
+  Serial.print(angle_pitch, 6);
+  Serial.print(", ");
+  Serial.println(cur_time);
   //delay(50); // 50 ms delay
     
 }
