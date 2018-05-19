@@ -4,6 +4,9 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
 
+
+Servo myservo;
+
 Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
 double calAccX = 0, calAccY = 0;
 double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
@@ -15,10 +18,14 @@ double filterConstant = .9996;
 
 // Set-up servos
 
-double PID, error, previous_error;
+double PID, error, previous_error, error_total;
 double pid_p = 0, pid_i = 0;, pid_d = 0;
 
+
+
 // PID constants (WILL ADJUST)
+
+
 double kp = 3;
 double ki = .01;
 double kd = 2;
@@ -171,32 +178,226 @@ void loop() {
 
   angle_pitch = angle_pitch * filterConstant + angle_pitch_acc * (1.0-filterConstant);     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
   angle_roll = angle_roll * filterConstant + angle_roll_acc * -(1.0-filterConstant);        //Correct the drift of the gyro roll angle with the accelerometer roll angle
+
+
   
 
   // Calculate error between either angle_pitch/ angle_roll and desired angle
-  
+
+
+
+  /*
+
+Error will always be the difference between your current value and your desired value. 
+
+If error > 0 => You need to decrease PID value. 
+
+If error < 0 => You need to increase PID value.
+
+   */
+   
+
+
+  error_angle_pitch =  (desired_angle_pitch) - (angle_pitch)   // The pitch angle will have a specific amount of error associated with it. 
+
+ // error_angle_roll =  (desired_angle_roll) - (angle_roll) ;     // The roll angle will have a specific amount of error associated with it.
+
+ // error = (error_angle_pitch) + (error_angle_roll);     // The total error from both pitch and roll will be the sum of the errors.
+
+ error = error_angle_pitch
+
+  delta_error = error - previous_error;   // This is so that we can find the difference in error when we're finding the derivative of error.
+
+
+
+ 
   // Calculate pid_p = kp * error;
+
+
+
+
+  pid_p_pitch = kp * error_angle_pitch;
+  
+
+
+
+
+
+  /*
+
+Source: https://sites.google.com/a/eng.ucsd.edu/quadcopterclass/labs/lab-7-flight-control
+
+This one is a little trickier.  The obvious answer is to just sum the error term forever.  
+The problem here is that if you happen to hold your test platform steady with your hand, the integral will grow rapidly. 
+For instance, if you hold it in a position where the error term is positive for 10 seconds, the integral term will come to a large positive value.  
+When you release the platform, the platform will move sharply to a position with negative error (because it has been trying for 10 seconds to reduce the positive error).  
+It will then take a while (maybe another 10 seconds) to "unwind" the integral by adding in the negative error.
+
+There are couple of solution to this:
+You can have the integral decay over time.  For instance, instead computing sum = sum + e each iteration, you could do sum = 3*sum/4 + e.
+You can also just bound the integral at some value.  Some trial and error may be required to find a reasonable bound.
+
+   
+   */
+
+
+
   
   // Calculate pid_i and only use for values between -3 and 3 degrees?
 
+  // integral = integral + (error*iteration_time) if and only if:
+
+  // -3 < angle_pitch < 3 
+ 
+  // -3 < angle_roll < 3
+
+/*
+
+So we only want to use the integral control if the error is very small. 
+
+We should be careful with this because the integral term lets the controller handle errors that are accumulating over time. 
+This is good when we need to get rid of the steady state error.
+The problem is is that if we  have a large KI (which I don't think we will) we would be trying to correct the error over time. That means, it could interfere with the response for dealing with
+changes in the current. I've read online that this is one of the causes of instability in the PID controller.
+
+
+ */
+
+ 
+  if (angle_roll < 3  || angle_roll > -3 ) {
+  
+  pid_i_pitch = ki + (error*cur_time);
+    
+  }
+
+
+  else if (angle_pitch < 3 || angle_pitch <  -3) {
+   
+  pid_i = ki + (error*cur_time);
+  }
+
+  
+  else {
+    pid_i = 0;
+  }
+
+
+
   // Calculate pid_d
+
+
+  /*
+Source: https://sites.google.com/a/eng.ucsd.edu/quadcopterclass/labs/lab-7-flight-control
+
+The easiest way to compute the derivative is by dividing the change in error by the change in time.  Just remember:
+To measure time in seconds.
+Be sure you have the sign right on e(t) and de/dt.  If you get it backwards nothing will work.
+To use the actual elapse time since your last measurement.
+It is also possible to use the raw output from the gyroscope (since you are mostly integrated it to get the estimate of your pitch angle).
+
+
+
+So, in this case,
+
+Our Difference in Error = Current Error - previous_error
+
+Difference in Time = dt (where dt is in seconds)
+
+   
+   */
+
+
+pid_d_pitch = (error - previous_error) / (dt);    // Finding derivate of error
+
+
+  
 
   // Calculate PID
 
+  PID_pitch = (pid_p_pitch) + (pid_i_pitch) + (pid_d_pitch);
+
+
+
+
+  
+
   // Make sure that PID does not reach more than let's say 60 positions so 90+60 = 150 or 90-60 = 30
+
+
+// Cleared this up with JJ during Professor Zhang Meeting at Calit2 on Wednesday May 17th, 2018 
+
+// Since we're already doing this when we're "capping" the new_servo_angle at 160 in one of the conditions, we don't need to do it here again.
+
+
+
+
+
+/*
+
+I use servo.write() to write a value to the servo. This value would control the shaft of the servo motor.
+
+This value would set the angle of the shaft.
+
+Setting different values in the servo.write() argument means different things:
+
+
+1) Setting "0" means full-speed in its direction 
+
+2) Setting "180" means full-speed in the opposite direction 
+
+3) Setting "90" or somewhere close to it would set the shaft to the mid-point which means almost not moving.
+
+ */
+
 
   // Adjust position by adding PID to it
 
+
+  cur_servo_angle = servo.read()  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+
+  new_servo_angle = cur_servo_angle + PID; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
+
+ 
+  
+
   // Ensure again that new position does not violate anything
+
+
+
+
+
+// First check if the new_servo_angle that we calculated is past 160 degrees.
+
+  if (  new_servo_angle > 160 ) {
+
+
+  new_servo_angle = 160; //Just cap the new_servo_angle at 160 if it is going to ever exceed 160 after PID calculation.
+    
+  }
+
+  else {
+
+  new_servo_angle = new_servo_angle;    // If it's below our threshold, whatever new_servo_angle we just calculated, just make that the new_angle.
+    
+  }
+
+  
+  
 
   // Write new position to servo
 
+
+  myservo.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
+  new_servo_angle = servo.write(cur_servo_angle + PID); // adjusting position of servo by adding actual PID value to current servo angle.
+
+
+
+
   // set previous error = error
+
+
+  previous_error = error;
   
-
-
-
-
 
 
 }
