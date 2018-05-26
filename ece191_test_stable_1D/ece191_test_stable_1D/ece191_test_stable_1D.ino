@@ -2,11 +2,12 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <servo.h>//Using servo library to control ESC
+#include <servo.h>//Using servo library to control ESC
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
 
 
-Servo myservo_pitch;
+//Servo myservo_pitch;
 Servo myservo_roll;
 Servo esc;
 
@@ -17,7 +18,7 @@ double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
 double prev_time = 0;
 double dt;
 double cur_time = 0;
-double filterConstant = .99;
+double filterConstant = .98;
 
 // Set-up servos
 
@@ -48,9 +49,9 @@ Use Ziegler Method:
 ***********************************************************************/
 
 
-double kp = 3;
-double ki = .01;
-double kd = 2;
+double kp = 3;  //3
+double ki = 0; //.01
+double kd = 0;   // 2
 
 // Initial values or servos
 double initial_pos = 90; // 180/2 for full range of motion
@@ -83,7 +84,7 @@ boolean calibrateSensor(int numData)
 {
   sensors_event_t accel, mag, gyro, temp;
   int i;
-  double calibrationValue = 0.3;
+  double calibrationValue = 2.0;
   double gyroX, gyroY, gyroZ;
   
   for (i = 0; i < numData; i += 1){
@@ -130,6 +131,12 @@ boolean calibrateSensor(int numData)
 
 void setup() {
   boolean goodCalibration = false;
+ // myservo_pitch.attach(11);  // attaches the servo on pin 9 to the servo object
+  myservo_roll.attach(5);  // attaches the servo on pin 7 to the servo object
+    
+  esc.attach(8);
+  esc.writeMicroseconds(1000);
+    
 #ifndef ESP8266
   while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
 #endif
@@ -154,14 +161,11 @@ void setup() {
 
   // Attach servos to arduino using the servo.h library and attach method
   
-    myservo_pitch.attach(9);  // attaches the servo on pin 9 to the servo object
-    myservo_roll.attach(7);  // attaches the servo on pin 7 to the servo object
-    myservo_pitch.write(initial_pos);
-    myservo_roll.write(initial_pos);
-    
-    esc.attach(5);
-    esc.writeMicroseconds(1000);
-  
+  myservo_roll.write(initial_pos);
+  myservo_roll.write(initial_pos + 10);
+  myservo_roll.write(initial_pos);
+ // myservo_roll.write(initial_pos);
+  delay(5000);
   cur_time = millis();
 }
 
@@ -181,10 +185,10 @@ void loop() {
 
 // Turns ESC on
   int val; //Creating a variable val
-  val= analogRead(A0); //Read input from analog pin a0 and store in val
-  val= map(val, 0, 1023,900,2100); //mapping val to minimum and maximum(Change if needed) 
+  val= 1500; // min around 900, max around 2100
   esc.writeMicroseconds(val); //using val as the signal to esc
-
+  
+  
   prev_time = cur_time;
   cur_time = millis();
   dt = (cur_time - prev_time) / (1000.0);
@@ -430,7 +434,7 @@ Setting different values in the servo.write() argument means different things:
   // Adjust position by adding PID to it
 
 
-  cur_servo_angle_pitch = myservo_pitch.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+//  cur_servo_angle_pitch = myservo_pitch.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
 
   new_servo_angle_pitch = cur_servo_angle_pitch + PID_pitch; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
 
@@ -529,7 +533,7 @@ Setting different values in the servo.write() argument means different things:
 
 
  // myservo_pitch.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
-  myservo_pitch.write(new_servo_angle_pitch); // adjusting position of servo by adding actual PID value to current servo angle.
+ // myservo_pitch.write(new_servo_angle_pitch); // adjusting position of servo by adding actual PID value to current servo angle.
 
  // myservo_roll.attach(); // We have to put in the specific servo motor we want to write to. So inside attach(), the argument is going to be the signal pin of the servo motor we want to change.
   myservo_roll.write(new_servo_angle_roll); // adjusting position of servo by adding actual PID value to current servo angle.
@@ -541,6 +545,11 @@ Setting different values in the servo.write() argument means different things:
   previous_error_pitch = error_angle_pitch;
   previous_error_roll = error_angle_roll;
 
+  Serial.print("Pitch Angle: ");
+  Serial.println(angle_pitch);
+  
+  Serial.print("Previous error: ");
+  Serial.println(previous_error_pitch);
+
 
 }
-
