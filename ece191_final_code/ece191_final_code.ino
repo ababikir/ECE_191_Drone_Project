@@ -19,19 +19,20 @@ double dt;
 double cur_time = 0;
 double filterConstant = .98;
 
-double PID_pitch, PID_roll;
+double PID_pitch = 0, PID_roll = 0;
 double previous_error_pitch = 0, previous_error_roll = 0;
-double new_servo_angle_pitch, new_servo_angle_roll;
 double integration_cuttoff_angle = 1;
 
-double kp = 3;  //3
+double kp = .03;  //3
 double ki = 0; //.01
 double kd = 0;   // 2
 
 // Initial values or servos
 double initial_pos = 90; // 180/2 for full range of motion
-double desired_angle_pitch = 0, desired_angle_roll = 0; // to stay steady
+double desired_angle_pitch = 1, desired_angle_roll = 1; // to stay steady
 int servoLowerBound = 40, servoUpperBound = 140;
+double cur_servo_angle_pitch = initial_pos, cur_servo_angle_roll = initial_pos;
+double new_servo_angle_pitch, new_servo_angle_roll; 
 
 // Function to set-up sensor
 void configureSensor(void)
@@ -60,7 +61,7 @@ boolean calibrateSensor(int numData)
 {
   sensors_event_t accel, mag, gyro, temp;
   int i;
-  double calibrationValue = 2.0;
+  double calibrationValue = .5;
   double gyroX, gyroY, gyroZ, accX, accY;
   
   for (i = 0; i < numData; i += 1){
@@ -141,7 +142,9 @@ void updateAngles() {
   gyroZ = gyro.gyro.z - calGyroZ;
 
   // Gyro Integration
-  prev_time = millis();
+  prev_time = cur_time;
+  cur_time = millis();
+  dt = (cur_time - prev_time) / (1000.0);
   angle_pitch += (gyroX*dt); 
   angle_roll += gyroY*dt; 
 
@@ -163,8 +166,6 @@ void updateAngles() {
 
 void calculatePID() {
   double delta_error_pitch = 0, delta_error_roll = 0;
-  double cur_servo_angle_pitch, cur_servo_angle_roll;
-  double new_servo_angle_pitch, new_servo_angle_roll;
   double error_angle_pitch, error_angle_roll;
   double pid_p_pitch, pid_p_roll, pid_i_pitch, pid_i_roll, pid_d_pitch, pid_d_roll;
   
@@ -173,10 +174,11 @@ void calculatePID() {
   
   delta_error_pitch = error_angle_pitch - previous_error_pitch;   // This is so that we can find the difference in error when we're finding the derivative of error.
   delta_error_roll = error_angle_roll - previous_error_roll;
-  
+
   pid_p_pitch = kp * error_angle_pitch;
   pid_p_roll = kp * error_angle_roll;
-  
+
+  /*
   if (angle_roll < integration_cuttoff_angle  || angle_roll > -integration_cuttoff_angle ) {
     pid_i_roll = ki + (error_angle_roll*cur_time);
   }
@@ -188,13 +190,15 @@ void calculatePID() {
   }
   else {
     pid_i_pitch= 0;
-  }
-  
-  pid_d_pitch = (error_angle_pitch - previous_error_pitch) / (dt);    // Finding derivate of error
-  pid_d_roll = (error_angle_roll - previous_error_roll) / (dt);
-  
-  PID_pitch = (pid_p_pitch) + (pid_i_pitch) + (pid_d_pitch);
+  }*/
+  pid_i_roll=0;
+  pid_i_pitch= 0;
 
+  pid_d_pitch = kd*(error_angle_pitch - previous_error_pitch) / (dt);    // Finding derivate of error
+  pid_d_roll = kd*(error_angle_roll - previous_error_roll) / (dt);
+
+  PID_pitch = (pid_p_pitch) + (pid_i_pitch) + (pid_d_pitch);
+  
   PID_roll = (pid_p_roll) + (pid_i_roll) + (pid_d_roll);
   
   previous_error_pitch = error_angle_pitch;
@@ -202,20 +206,19 @@ void calculatePID() {
 }
 
 void moveServos() {
-  double cur_servo_angle_pitch, cur_servo_angle_roll;
-
-  cur_servo_angle_pitch = myservo_pitch.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+ // cur_servo_angle_pitch = myservo_pitch.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
   new_servo_angle_pitch = cur_servo_angle_pitch + PID_pitch; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
-  cur_servo_angle_roll = myservo_roll.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+//  cur_servo_angle_roll = myservo_roll.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
   new_servo_angle_roll = cur_servo_angle_roll + PID_roll; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
-
+  
 
 // First check if the new_servo_angle that we calculated is past 160 degrees.
   checkServoBounds();
   
-  myservo_pitch.write(new_servo_angle_pitch); // adjusting position of servo by adding actual PID value to current servo angle.
+//  myservo_pitch.write(new_servo_angle_pitch); // adjusting position of servo by adding actual PID value to current servo angle.
   myservo_roll.write(new_servo_angle_roll); // adjusting position of servo by adding actual PID value to current servo angle.
-
+  cur_servo_angle_pitch = new_servo_angle_pitch;
+  cur_servo_angle_roll = new_servo_angle_roll;
 }
 
 void checkServoBounds() {
@@ -250,20 +253,23 @@ void checkServoBounds() {
 }
 
 void printResults() {
-  Serial.print("Pitch Angle: ");
-  Serial.println(angle_pitch);
+  //Serial.print("Pitch Angle: ");
+  Serial.print(angle_roll);
+  Serial.print(", ");
   
-  Serial.print("Previous error: ");
-  Serial.println(previous_error_pitch);
+ // Serial.print("Previous error: ");
+  Serial.print(previous_error_roll);
+  Serial.print(", ");
 
-  Serial.print("New Servo Angle: ");
+ // Serial.print("New Servo Angle: ");
   Serial.println(new_servo_angle_roll);
+
 }
 
 
 void setup() {
   boolean goodCalibration = false;
-  myservo_roll.attach(5);  // attaches the servo on pin 5 to the servo object
+  myservo_roll.attach(11);  // attaches the servo on pin 5 to the servo object
   esc.attach(8); // attaches the servo to pin 8 of the esc
   esc.writeMicroseconds(1000);
     
@@ -296,15 +302,17 @@ void setup() {
   
   myservo_roll.write(initial_pos);
   myservo_roll.write(initial_pos + 10);
+  delay(500);
   myservo_roll.write(initial_pos);
  // myservo_roll.write(initial_pos);
-  delay(5000);
+  delay(3000);
   cur_time = millis();
 }
 
 void loop() {
   
   turnOnMotor(1800); // speed range of between 1000-2100, 1000 won't turn on
+  updateAngles();
   calculatePID();
   moveServos();
   printResults();

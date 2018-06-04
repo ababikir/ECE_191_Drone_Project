@@ -27,6 +27,7 @@ double pid_p_pitch = 0, pid_i_pitch = 0, pid_d_pitch = 0;
 double pid_p_roll = 0, pid_i_roll = 0, pid_d_roll = 0;
 
 
+
 // PID constants (WILL ADJUST)
 
 /*********************************************************************
@@ -49,13 +50,15 @@ Use Ziegler Method:
 ***********************************************************************/
 
 
-double kp = .5;  //3
+double kp = .3;  //3
 double ki = 0; //.01
-double kd = .01;   // 2
+double kd = 0;   // 2
 
 // Initial values or servos
 double initial_pos = 90; // 180/2 for full range of motion
 double desired_angle_pitch = 0, desired_angle_roll = 0; // to stay steady
+double cur_servo_angle_pitch = initial_pos, cur_servo_angle_roll = initial_pos;
+double new_servo_angle_pitch, new_servo_angle_roll;
 
 // Function to set-up sensor
 void configureSensor(void)
@@ -162,11 +165,7 @@ void setup() {
   // Attach servos to arduino using the servo.h library and attach method
   
   myservo_roll.write(initial_pos);
-  delay(100);
-  myservo_roll.write(initial_pos + 10);
-  myservo_roll.write(initial_pos);
- // myservo_roll.write(initial_pos);
-  delay(5000);
+  delay(3000);
   cur_time = millis();
 }
 
@@ -181,8 +180,7 @@ void loop() {
   double convertToDegrees;
   double previous_error_pitch = 0, previous_error_roll = 0;
   double delta_error_pitch = 0, delta_error_roll = 0;
-  double cur_servo_angle_pitch, cur_servo_angle_roll;
-  double new_servo_angle_pitch, new_servo_angle_roll;
+
 
 // Turns ESC on
   int val; //Creating a variable val
@@ -437,11 +435,13 @@ Setting different values in the servo.write() argument means different things:
 
   new_servo_angle_pitch = cur_servo_angle_pitch + PID_pitch; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
 
-  cur_servo_angle_roll = myservo_roll.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
-  if(cur_servo_angle_roll < 10) {
-    cur_servo_angle_roll = initial_pos; }
+  //cur_servo_angle_roll = myservo_roll.read();  // Read the current angle of the servo (the value passed to the last call to servo.write() ). The argument inside read() is going to be the signal pin for the servo motor.
+  
+//  if(cur_servo_angle_roll < 10) {
+//    cur_servo_angle_roll = initial_pos; }
   new_servo_angle_roll = cur_servo_angle_roll + PID_roll; // Calculate the new_servo_angle by adding PID to the cur_servo_angle. Also, just to make sure I understand this, why are we adding PID to the servo angle? Won't we have to subtract in some cases?
 
+  
   Serial.print(angle_roll);
  // Serial.print("Error Angle: ");
   Serial.print(", ");
@@ -561,7 +561,7 @@ Setting different values in the servo.write() argument means different things:
 
   previous_error_pitch = error_angle_pitch;
   previous_error_roll = error_angle_roll;
-
+  cur_servo_angle_roll = new_servo_angle_roll;
 
 //  Serial.print("Adjusted Servo Angle: ");
   Serial.println(new_servo_angle_roll);
