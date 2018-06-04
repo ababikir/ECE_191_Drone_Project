@@ -286,13 +286,51 @@ void Altitude() {
   float altm = baro.getAltitude();
   Serial.print(altm); Serial.println(" meters");
 
+
+  // This sensor also reads the temperature. We don't need to read the temperature.
+  /*
   float tempC = baro.getTemperature();
   Serial.print(tempC); Serial.println("*C");
+  */
 
   delay(250); // This delay was given in the example code of the altitude sensor. We can take this out. 
   // But, for testing purposes, we'll leave it in just to see if the sensor is working properly. 
   // It may need calibration/tuning just like the LSM9DS0 sensor.
 }
+
+
+
+
+
+void checkAltitude() // We want to keep the drone in between a specific boundary of altitude.
+
+{
+
+/*
+ 
+ We don't want the drone to exceed an altitude of 1 meter. 
+ To keep it under 1 meter altitude, the "val" variable (the propeller's speed), needs to be under a specific value. 
+
+ The faster the propeller is spinning, the drone will be at a higher atltiude.
+ The slower the propeller is spinning, the drone will be at a lower altitude.
+ 
+*/
+
+
+ 
+if ( altm > 1) // If altitude > 1 meter => Make the motor speed slower so that the drone drops in altitude.
+{
+
+  // Make the val sent to the motor slower so that the drone drops in altitude.
+  val = 1300;
+}
+
+else 
+{
+  motorSpeed = motorSpeed;
+}
+
+
 
 
 
@@ -349,6 +387,7 @@ void loop() {
   calculatePID();  // Calculate the total PID value based on the current and desired pitch/roll angles.
   moveServos();    // Based on the PID value, make decision to move servos (or not).
   printResults();  // Print out final results.
+  checkAltitude(); // Keep checking altitude to make sure drone does not exceed > 1 meter.
   
 }
 
