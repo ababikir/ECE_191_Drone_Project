@@ -1,7 +1,13 @@
+#include <Servo.h>
+#include <servo.h>//Using servo library to control ESC
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
+
+Servo esc;
+Servo myservo;
+
 
 Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
 double calAccX = 0, calAccY = 0;
@@ -10,7 +16,8 @@ double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
 double prev_time = 0;
 double dt;
 double cur_time = 0;
-double filterConstant = 1;
+double filterConstant = .98;
+int i = 40;
 
 
 
@@ -40,7 +47,7 @@ boolean calibrateSensor(int numData)
 {
   sensors_event_t accel, mag, gyro, temp;
   int i;
-  double calibrationValue = 0.3;
+  double calibrationValue = 2.0;
   double gyroX, gyroY, gyroZ;
   
   for (i = 0; i < numData; i += 1){
@@ -86,6 +93,9 @@ boolean calibrateSensor(int numData)
 
 
 void setup() {
+  esc.attach(8); //Specify the esc signal pin,Here as D8
+  esc.writeMicroseconds(1000); //initialize the signal to 1000
+  myservo.attach(11);
   boolean goodCalibration = false;
 #ifndef ESP8266
   while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
@@ -113,6 +123,7 @@ void setup() {
 
 void loop() {
   
+  
   sensors_event_t accel, mag, gyro, temp;
   double accelX, accelY, accelZ;
   double gyroX, gyroY, gyroZ;
@@ -120,7 +131,12 @@ void loop() {
   double acc_mag_vector;
   double angle_pitch_acc, angle_roll_acc;
   double convertToDegrees;
-
+  
+  int val;
+  
+  val = 1800;
+  esc.writeMicroseconds(val); //using val as the signal to esc
+  
   prev_time = cur_time;
   cur_time = millis();
   dt = (cur_time - prev_time) / (1000.0);
@@ -154,9 +170,14 @@ void loop() {
   angle_pitch = angle_pitch * filterConstant + angle_pitch_acc * (1.0-filterConstant);     //Correct the drift of the gyro pitch angle with the accelerometer pitch angle
   angle_roll = angle_roll * filterConstant + angle_roll_acc * -(1.0-filterConstant);        //Correct the drift of the gyro roll angle with the accelerometer roll angle
   
-  Serial.print(angle_pitch, 6);
-  Serial.print(", ");
-  Serial.println(cur_time);
+  Serial.println(angle_roll, 6);
+  //Serial.print(", ");
+  //Serial.println(cur_time);
   //delay(50); // 50 ms delay
-    
+ 
+  if (i > 130) {
+    i = 50; }
+  i = i + 1;
+  delay(100);
+  myservo.write(i);
 }

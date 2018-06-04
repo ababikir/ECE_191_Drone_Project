@@ -1,8 +1,12 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Servo.h>
+#include <servo.h>//Using servo library to control ESC
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM9DS0.h>
+
+Servo esc;
+Servo myservo;
 
 Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
 double calAccX = 0, calAccY = 0;
@@ -10,7 +14,7 @@ double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
 double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
 double prev_time = 0;
 double dt;
-double cur_time = 0, prev_time;
+double cur_time = 0;
 double filterConstant = .9996;
 
 // Set-up servos
