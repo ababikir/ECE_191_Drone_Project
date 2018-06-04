@@ -4,13 +4,16 @@
 #include <servo.h>//Using servo library to control ESC
 #include <servo.h>//Using servo library to control ESC
 #include <Adafruit_Sensor.h>
-#include <Adafruit_LSM9DS0.h>
+#include <Adafruit_MPL3115A2.h> // Altitude sensor library
+#include <Adafruit_LSM9DS0.h>   // Gyro and Accelerometer librar
+
 
 Servo myservo_pitch;
 Servo myservo_roll;
 Servo esc;
 
-Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // Use I2C, ID #1000
+Adafruit_MPL3115A2 baro = Adafruit_MPL3115A2(); // Altitude Sensor, Uses I2C - connect SCL to the SCL pin, SDA to SDA pin
+Adafruit_LSM9DS0 lsm = Adafruit_LSM9DS0(1000);  // LSM9DS0 sensor, Use I2C, ID #1000
 double calAccX = 0, calAccY = 0;
 double calGyroX = 0, calGyroY = 0, calGyroZ = 0;
 double angle_pitch = 0, angle_roll = 0, angle_yaw = 0;
@@ -267,8 +270,37 @@ void printResults() {
 }
 
 
+
+
+void Altitude() {
+  if (! baro.begin()) {
+    Serial.println("Couldnt find sensor");
+    return;
+  }
+  
+  float pascals = baro.getPressure();
+  // Our weather page presents pressure in Inches (Hg)
+  // Use http://www.onlineconversion.com/pressure.htm for other units
+  Serial.print(pascals/3377); Serial.println(" Inches (Hg)");
+
+  float altm = baro.getAltitude();
+  Serial.print(altm); Serial.println(" meters");
+
+  float tempC = baro.getTemperature();
+  Serial.print(tempC); Serial.println("*C");
+
+  delay(250); // This delay was given in the example code of the altitude sensor. We can take this out. 
+  // But, for testing purposes, we'll leave it in just to see if the sensor is working properly. 
+  // It may need calibration/tuning just like the LSM9DS0 sensor.
+}
+
+
+
+
 void setup() {
   boolean goodCalibration = false;
+   Serial.begin(9600);
+  Serial.println("Adafruit_MPL3115A2 test!");
   myservo_roll.attach(11);  // attaches the servo on pin 5 to the servo object
   esc.attach(8); // attaches the servo to pin 8 of the esc
   esc.writeMicroseconds(1000);
@@ -311,10 +343,16 @@ void setup() {
 
 void loop() {
   
-  turnOnMotor(1800); // speed range of between 1000-2100, 1000 won't turn on
-  updateAngles();
-  calculatePID();
-  moveServos();
-  printResults();
+  turnOnMotor(1800); // speed range of between 1000-2100, 1000 won't turn on, 2100 is max speed.
+  Altitude(); // Call Altitude Sensor to start setup and start measuring altitude
+  updateAngles();  // Calculate the pitch and roll angles from LSM9DS0 sensor (gyro+accelerometer built in).
+  calculatePID();  // Calculate the total PID value based on the current and desired pitch/roll angles.
+  moveServos();    // Based on the PID value, make decision to move servos (or not).
+  printResults();  // Print out final results.
   
 }
+
+
+
+}
+
